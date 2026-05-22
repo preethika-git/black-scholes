@@ -4,12 +4,13 @@ import yfinance as yf
 from scipy.stats import norm
 
 # inputs and data
-s_price = yf.download("AAPL", period="max", auto_adjust=True)["Close"].squeeze()
+company = {"Apple Inc":"AAPL"}
+s_price = yf.download(list(company.values())[0], period="max", auto_adjust=True)["Close"].squeeze()
 log_returns = np.log(s_price / s_price.shift(1)).dropna()
 std = float(np.std(log_returns) * np.sqrt(252))
 
-S = float(s_price.iloc[-1])
-X = 320     # change to user input
+X = float(s_price.iloc[-1])
+S = np.linspace(X * 0.75, X * 1.25, 100)
 r = 0.05    # fixed rate from fixed income 
 T = 1       # change to user input
 
@@ -48,28 +49,53 @@ def compute_greeks(S,X,r,T,std):
     rho_put = -X * T * np.e**(-r*T) * N(-d2)
 
     return {
-        "delta_call"    : delta_call,
-        "delta_put"     : delta_put,
-        "theta_call"    : theta_call,
-        "theta_put"     : theta_put,
-        "gamma"         : gamma,
-        "vega"          : vega,
-        "rho_call"      : rho_call,
-        "rho_put"       : rho_put,
+        "delta_call"    : delta_call.round(2),
+        "delta_put"     : delta_put.round(2),
+        "theta_call"    : theta_call.round(2),
+        "theta_put"     : theta_put.round(2),
+        "gamma"         : gamma.round(2),
+        "vega"          : vega.round(2),
+        "rho_call"      : rho_call.round(2),
+        "rho_put"       : rho_put.round(2),
     }
 
-# calculate prices and verify put-call parity
-call_price, put_price = compute_call_put(S, X, r, T, std)
+# calculate option prices, verify put-call parity, calculate greeks for different stock prices
+results = {
+    "stock_price": [],
+    "call_price": [],
+    "put_price": [],
+    "delta_call": [],
+    "delta_put": [],
+    "theta_call": [],
+    "theta_put": [],
+    "gamma": [],
+    "vega": [],
+    "rho_call": [],
+    "rho_put": []
+    }
 
-parity_check = S - X * np.exp(-r*T)
-if np.isclose(call_price - put_price, parity_check):
-    print(f"Put-call parity holds")
-else:
-    print(f"Parity difference: {call_price - put_price - parity_check}")
+for S in S:
+    results["stock_price"].append(S.round(2))
+    
+    call_price, put_price = compute_call_put(S, X, r, T, std)
 
-print(f"Call: {call_price:.2f}, Put: {put_price:.2f}")
+    parity_check = S - X * np.exp(-r*T)
+    if np.isclose(call_price - put_price, parity_check) == False:
+        print(f"Parity difference: {call_price - put_price - parity_check} (stock: {S})")
+        continue
 
-# calculate greeks
-greeks = pd.DataFrame(compute_greeks(S,X,r,T,std), index=["values"]).T
-greeks["values"] = greeks["values"].round(4)
-print(greeks)
+    results["call_price"].append(call_price.round(2))
+    results["put_price"].append(put_price.round(2))
+
+    greeks = compute_greeks(S,X,r,T,std)
+
+    results["delta_call"].append(greeks["delta_call"])
+    results["delta_put"].append(greeks["delta_put"])
+    results["theta_call"].append(greeks["theta_call"])
+    results["theta_put"].append(greeks["theta_put"])
+    results["gamma"].append(greeks["gamma"])
+    results["vega"].append(greeks["vega"])
+    results["rho_call"].append(greeks["rho_call"])
+    results["rho_put"].append(greeks["rho_put"])
+
+results = pd.DataFrame(results)
