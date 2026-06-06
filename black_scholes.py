@@ -5,17 +5,27 @@ from scipy.stats import norm
 import matplotlib.pyplot as plt
 
 # inputs and data
+
 company = {"Apple Inc":"AAPL"}
 s_price = yf.download(list(company.values())[0], period="max", auto_adjust=True)["Close"].squeeze()
 log_returns = np.log(s_price / s_price.shift(1)).dropna()
 std = float(np.std(log_returns) * np.sqrt(252))
 
-X = float(s_price.iloc[-1])
-S = np.linspace(X * 0.75, X * 1.25, 100)
-r = 0.05    # fixed rate from fixed income 
-T = 1       # change to user input
+S = float(s_price.iloc[-1])
+S_range = np.linspace(int(X) * 0.75, int(X) * 1.25, 100)
+r = 0.05
 
-# define formulas for option prices and greeks
+# ask user for the following input from the same option
+
+X = 307.5                   # strike price
+M = 3.41                    # market price    
+expiry_date = "2026-06-08"  # expiry date 
+
+today = pd.Timestamp.now()
+T = (pd.Timestamp(expiry_date) - today).days / 365
+
+# define for Black-Scoles pricing and Greeks
+
 def compute_d1_d2(S, X, r, T, std):
     d1 = (np.log(S/X) + (r + (std**2)/2) * T) / (std * np.sqrt(T))
     d2 = d1 - std * np.sqrt(T)
@@ -50,17 +60,17 @@ def compute_greeks(S,X,r,T,std):
     rho_put = -X * T * np.e**(-r*T) * N(-d2)
 
     return {
-        "delta_call"    : delta_call.round(2),
-        "delta_put"     : delta_put.round(2),
-        "theta_call"    : theta_call.round(2),
-        "theta_put"     : theta_put.round(2),
-        "gamma"         : gamma.round(2),
-        "vega"          : vega.round(2),
-        "rho_call"      : rho_call.round(2),
-        "rho_put"       : rho_put.round(2),
+        "delta_call"    : delta_call,
+        "delta_put"     : delta_put,
+        "theta_call"    : theta_call,
+        "theta_put"     : theta_put,
+        "gamma"         : gamma,
+        "vega"          : vega,
+        "rho_call"      : rho_call,
+        "rho_put"       : rho_put,
     }
 
-# calculate option prices, verify put-call parity, calculate greeks for different stock prices
+# calculate option prices and greeks    
 results = {
     "stock_price": [],
     "call_price": [],
@@ -75,31 +85,67 @@ results = {
     "rho_put": []
     }
 
-for S in S:
-    results["stock_price"].append(S.round(2))
+for stk in S_range:
+    results["stock_price"].append(stk.round(2))
     
-    call_price, put_price = compute_call_put(S, X, r, T, std)
+    call_price, put_price = compute_call_put(stk, X, r, T, std)
 
-    parity_check = S - X * np.exp(-r*T)
+    parity_check = stk - X * np.exp(-r*T)
     if np.isclose(call_price - put_price, parity_check) == False:
-        print(f"Parity difference: {call_price - put_price - parity_check} (stock: {S})")
+        print(f"Parity difference: {call_price - put_price - parity_check} (stock: {stk})")
         continue
 
     results["call_price"].append(call_price.round(2))
     results["put_price"].append(put_price.round(2))
 
-    greeks = compute_greeks(S,X,r,T,std)
+    greeks = compute_greeks(stk,X,r,T,std)
 
-    results["delta_call"].append(greeks["delta_call"])
-    results["delta_put"].append(greeks["delta_put"])
-    results["theta_call"].append(greeks["theta_call"])
-    results["theta_put"].append(greeks["theta_put"])
+    results["delta_call"].append(greeks["delta_call"].round(2))
+    results["delta_put"].append(greeks["delta_put"].round(2))
+    results["theta_call"].append(greeks["theta_call"].round(2))
+    results["theta_put"].append(greeks["theta_put"].round(2))
     results["gamma"].append(greeks["gamma"])
-    results["vega"].append(greeks["vega"])
-    results["rho_call"].append(greeks["rho_call"])
-    results["rho_put"].append(greeks["rho_put"])
+    results["vega"].append(greeks["vega"].round(2))
+    results["rho_call"].append(greeks["rho_call"].round(2))
+    results["rho_put"].append(greeks["rho_put"].round(2))
 
-results = pd.DataFrame(results)
+results = pd.DataFrame(results)  
+
+# define formulas for Implied Volatility solver
+
+def iv_f(S, X, r, T, std):
+    call_price, put_price = compute_call_put(S, X, r, T, std)
+    return call_price - M
+
+def iv_fdash(S,X,r,T,std):
+    greeks = compute_greeks(S,X,r,T,std)
+    return greeks["vega"]
+
+def newton_rhapson(S,X,r,T,std):
+    
+    initial_guess = M/(S*np.sqrt(T)*0.4)  
+
+    max_iterations = 100
+    tolerance = 1e-6
+
+    IV_old = initial_guess
+
+    for i in range(max_iterations):
+        IV_new = IV_old - (iv_f(S, X, r, T, std=IV_old)/iv_fdash(S, X, r, T, std=IV_old))
+        if abs(IV_new-IV_old) < tolerance:
+            return IV_new
+        IV_old = IV_new
+        
+    print(f"IV solver did not converge in {max_iterations} iterations")
+    return IV_new
+
+# calculate IV and verify
+
+IV = newton_rhapson(S,X,r,T,std)
+
+verification_price, _ = compute_call_put(S, X, r, T, IV)
+if not np.isclose(M, verification_price):
+    print("Market Price and Recovered price from IV does not match")
 
 # plotting charts
 
