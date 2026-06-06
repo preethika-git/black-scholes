@@ -12,7 +12,7 @@ log_returns = np.log(s_price / s_price.shift(1)).dropna()
 std = float(np.std(log_returns) * np.sqrt(252))
 
 S = float(s_price.iloc[-1])
-S_range = np.linspace(int(X) * 0.75, int(X) * 1.25, 100)
+S_range = np.linspace(int(S) * 0.75, int(S) * 1.25, 100)
 r = 0.05
 
 # ask user for the following input from the same option
