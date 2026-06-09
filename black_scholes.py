@@ -111,6 +111,10 @@ for stk in S_range:
 
 results = pd.DataFrame(results)  
 
+# export results to csv
+
+results.to_csv("greeks.csv", index=False)
+
 # define formulas for Implied Volatility solver
 
 def iv_f(S, X, r, T, std):
@@ -146,6 +150,30 @@ IV = newton_rhapson(S,X,r,T,std)
 verification_price, _ = compute_call_put(S, X, r, T, IV)
 if not np.isclose(M, verification_price):
     print("Market Price and Recovered price from IV does not match")
+
+# summary 
+
+print("="*50)
+print(f"Black-Scholes Option Pricing - {list(company.keys())[0]}")
+print("="*50)
+print(f"Current Price: {S:.2f}")
+print(f"Strike Price: {X:.2f}")
+print(f"Days to Expiry: {T*365} days ({expiry_date})")
+print(f"Risk-free Rate: {r:.2f}")
+print(f"Option Market Price: {M}")
+print(f"Historical Volatility: {std:.2%}")
+print(f"Implied Volatility: {IV:.2%}")
+print("="*50)
+
+# current greeks
+
+current_greeks = compute_greeks(S,X,r,T,std)
+
+print("="*50)
+print(f"Greeks at Current Price (${S:.2f})")
+print("="*50)
+for greek, value in current_greeks.items():
+    print(f"{greek}: {value}")
 
 # plotting charts
 
