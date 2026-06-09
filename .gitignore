@@ -1,4 +1,6 @@
 black_scholes_nb.ipynb
+greeks.csv
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
