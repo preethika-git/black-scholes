@@ -15,7 +15,7 @@ S = float(s_price.iloc[-1])
 S_range = np.linspace(int(S) * 0.75, int(S) * 1.25, 100)
 r = 0.05
 
-# ask user for the following input from the same option
+# user input for the following from the same option 
 
 X = 307.5                   # strike price
 M = 3.41                    # market price    
@@ -71,6 +71,7 @@ def compute_greeks(S,X,r,T,std):
     }
 
 # calculate option prices and greeks    
+
 results = {
     "stock_price": [],
     "call_price": [],
@@ -93,7 +94,7 @@ for stk in S_range:
     parity_check = stk - X * np.exp(-r*T)
     if np.isclose(call_price - put_price, parity_check) == False:
         print(f"Parity difference: {call_price - put_price - parity_check} (stock: {stk})")
-        continue
+        break
 
     results["call_price"].append(call_price.round(2))
     results["put_price"].append(put_price.round(2))
@@ -155,7 +156,7 @@ if not np.isclose(M, verification_price):
 
 print("="*50)
 print(f"Black-Scholes Option Pricing - {list(company.keys())[0]}")
-print("="*50)
+print("-"*50)
 print(f"Current Price: {S:.2f}")
 print(f"Strike Price: {X:.2f}")
 print(f"Days to Expiry: {T*365} days ({expiry_date})")
@@ -163,7 +164,7 @@ print(f"Risk-free Rate: {r:.2f}")
 print(f"Option Market Price: {M}")
 print(f"Historical Volatility: {std:.2%}")
 print(f"Implied Volatility: {IV:.2%}")
-print("="*50)
+print("="*50, end = "\n"*3)
 
 # current greeks
 
@@ -171,159 +172,108 @@ current_greeks = compute_greeks(S,X,r,T,std)
 
 print("="*50)
 print(f"Greeks at Current Price (${S:.2f})")
-print("="*50)
+print("-"*50)
 for greek, value in current_greeks.items():
-    print(f"{greek}: {value}")
+    print(f"{greek}: {value:.3f}")
+print("="*50)
 
 # plotting charts
 
-# option prices vs stock
-fig, ax = plt.subplots(figsize=(7,4))
+fig, axes = plt.subplots(3,2, figsize=(18,20))
+axes = axes.flatten()
 
-ax.plot(results["stock_price"], results["call_price"], color = "b", label = "Call")
-ax.plot(results["stock_price"], results["put_price"], color = "r", label = "Put")
-ax.axvline(x=X, linestyle="--", color="grey", lw = .5)
+plots = [
+        ([(results["call_price"], "call", "b"),(results["put_price"], "put", "r")], 
+        f"{list(company.keys())[0]}: Option Price vs Spot Price", "Option Price"),
+        ([(results["delta_call"],"call","b"),(results["delta_put"],"put","r")],
+        "Delta vs Spot","Delta"),
+        ([(results["theta_call"],"call","b"),(results["theta_put"],"put","r")],
+        "Theta vs Spot","Theta"),
+        ([(results["gamma"],"","b")],
+        "Gamma vs Spot","Gamma"),
+        ([(results["vega"],"","b")],
+        "Vega vs Spot","Vega"),
+        ([(results["rho_call"],"call","b"),(results["rho_put"],"put","r")],
+        "Rho vs Spot","Rho")
+        ]
 
-ax.set_ylabel("Option Price")
-ax.set_xlabel("Stock Price")
 
+          
 x_ticks = [i for i in range(int(((results["stock_price"].iloc[0]//10)*10)-10),
                             int(((results["stock_price"].iloc[-1]//10)*10)+20),10)]
-ax.set_xticks(x_ticks, labels=x_ticks, rotation = 45)
-ax.set_xlim(xmin = np.min(x_ticks)-10, xmax = np.max(x_ticks)+10)
 
-y_min = min(results["call_price"].min(), results["put_price"].min())
-y_max = max(results["call_price"].max(), results["put_price"].max())
-y_ticks = [i for i in range(int(((y_min//10)*10)-10),
-                            int(((y_max//10)*10)+20),10)]
-ax.set_yticks(y_ticks, labels=y_ticks)
+for idx, (y_data, title, ylabel) in enumerate(plots):
+    ax = axes[idx]
 
-plt.title(f"{list(company.keys())[0]}: Option vs Stock Price")
-plt.legend()
-plt.show()
+    for y, label, color in y_data:
+        ax.plot(results["stock_price"], y, label = label, color = color)
+    
+    ax.axvline(x=X, linestyle="--", color="grey", lw = .5)
+    ax.set_xlabel("Spot Price")
+    ax.set_ylabel(ylabel)
+    ax.set_xticks(x_ticks, labels=x_ticks, rotation = 45)
+    ax.set_xlim(xmin = np.min(x_ticks)-10, xmax = np.max(x_ticks)+10)
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    ax.tick_params(axis="both", labelsize=11)
 
-# delta
-fig, ax = plt.subplots(figsize=(7,4))
 
-ax.plot(results["stock_price"], results["delta_call"], color = "b", label="call")
-ax.plot(results["stock_price"], results["delta_put"], color = "r", label="put")
-ax.axvline(x=X, linestyle="--", color="grey", lw = .5)
+    if idx == 0:        # call put price vs spot
+        y_min = min(results["call_price"].min(), results["put_price"].min())
+        y_max = max(results["call_price"].max(), results["put_price"].max())
+        y_ticks = [i for i in range(int(((y_min//10)*10)-10),
+                                    int(((y_max//10)*10)+20),10)]
 
-ax.spines["bottom"].set_position("zero")
-ax.spines["top"].set_visible(False)
-ax.spines["right"].set_visible(False)
+        ax.set_yticks(y_ticks, labels=y_ticks)
+        ax.legend(loc = "center left")
+    
+    elif idx == 1:      # delta vs spot
+        ax.spines["bottom"].set_position("zero")
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
 
-ax.set_xlabel("Stock Price", loc="right", labelpad= -40)
-ax.set_ylabel("Delta")
+        ax.set_xlabel("Spot Price", loc="right", labelpad= -33)
 
-ax.set_yticks(np.arange(-1,1.1,0.2))
-ax.set_ylim(ymin=-1.1, ymax=1.1)
+        ax.set_yticks(np.arange(-1,1.1,0.2))
+        ax.set_ylim(ymin=-1.1, ymax=1.1)
 
-x_ticks = [i for i in range(int(((results["stock_price"].iloc[0]//10)*10)-10),
-                            int(((results["stock_price"].iloc[-1]//10)*10)+20),10)]
-ax.set_xticks(x_ticks, labels=x_ticks, rotation = 45)
-ax.set_xlim(xmin = np.min(x_ticks)-9, xmax = np.max(x_ticks)+5)
-ax.tick_params(axis="both", labelsize=8)
+        ax.legend(loc = "upper left")
 
-plt.title("Delta vs Stock")
-plt.legend()
-plt.show()
+    elif idx == 2:      # theta vs spot
+        ax.spines["bottom"].set_position("zero")
 
-# theta
-fig, ax = plt.subplots(figsize=(7,4))
+        t_min = min(results["theta_call"].min(), results["theta_put"].min())
+        t_max = max(results["theta_call"].max(), results["theta_put"].max())
+        t_ticks = np.arange(((t_min//15)*15)-10, 10, 15)
+        ax.set_yticks(t_ticks)
 
-ax.plot(results["stock_price"], results["theta_call"], label = "call", color = "b")
-ax.plot(results["stock_price"], results["theta_put"], label = "put", color = "r")
-ax.axvline(x=X, linestyle="--", color="grey", lw = .5)
+        ax.set_xlabel("Spot Price", labelpad= -33)
+        ax.legend(loc = "lower left")
 
-ax.spines["top"].set_visible(False)
-ax.spines["right"].set_visible(False)
-ax.spines["bottom"].set_position("zero")
+    elif idx == 3:      # gamma vs spot
+        g_ticks = np.arange(((min(results["gamma"])//0.001)*0.001), max(results["gamma"])+0.001, 0.001)
+        g_labels = [f"{i*(10**3):.0f}e-3" for i in g_ticks]
+        ax.set_yticks(g_ticks, labels=g_labels)
+        ax.set_ylim(ymin=min(g_ticks)-0.00012, ymax=max(g_ticks)+0.00012)
 
-ax.set_xlabel("Stock Price", labelpad=-43)
-ax.set_ylabel("Theta")
+    elif idx == 4:      # vega vs spot
+        v_min, v_max = min(results["vega"]), max(results["vega"])
+        v_ticks = np.arange(((v_min//5)*5)-5, ((v_max//5)*5)+10, 5)
+        ax.set_yticks(v_ticks)
+        ax.set_ylim(ymin=v_min-5, ymax=max(v_ticks)+3)
 
-ax.set_xticks(x_ticks, labels=x_ticks, rotation = 45)
-ax.set_xlim(xmin= np.min(x_ticks)-7, xmax=np.max(x_ticks)+7)
+    else:               # rho vs spot
+        ax.spines["bottom"].set_position("zero")
 
-t_min = min(results["theta_call"].min(), results["theta_put"].min())
-t_max = max(results["theta_call"].max(), results["theta_put"].max())
-t_ticks = np.arange(((t_min//5)*5)-10, 10, 5)
-ax.set_yticks(t_ticks)
+        r_min = min(min(results["rho_call"]), min(results["rho_put"]))
+        r_max = max(max(results["rho_call"]), max(results["rho_put"]))
+        r_ticks = np.arange(((r_min)//5)*5, r_max+5, 5)
+        r_label = [f"{i:.0f}" for i in r_ticks]
 
-ax.tick_params(axis="both", labelsize=9)
+        ax.set_yticks(r_ticks, labels=r_label)
+        ax.set_ylim(ymin=r_min-5, ymax=r_max+5)
 
-plt.title("Theta vs Stock Price")
-plt.legend(loc="lower left")
-plt.show()
+        ax.set_xlabel("Spot Price", labelpad= -33)
+        ax.legend(loc = "upper left")
 
-# gamma
-fig, ax = plt.subplots(figsize=(7,4))
-
-ax.plot(results["stock_price"], results["gamma"], color = "b")
-ax.axvline(X, color="grey", lw=0.5, ls="--")
-
-ax.set_xlabel("Stock Price")
-ax.set_ylabel("Gamma")
-
-ax.set_xticks(x_ticks, labels=x_ticks, rotation = 45)
-ax.set_xlim(min(x_ticks)-5, max(x_ticks)+5)
-
-g_ticks = np.arange(((min(results["gamma"])//0.00025)*0.00025), max(results["gamma"])+0.00025, 0.00025)
-g_labels = [f"{i*(10**3):.2f}e-3" for i in g_ticks]
-ax.set_yticks(g_ticks, labels=g_labels)
-ax.set_ylim(ymin=min(g_ticks)-0.00012, ymax=max(g_ticks)+0.00012)
-
-plt.title("Gamma vs Stock Price")
-plt.show()
-
-# vega
-fig, ax = plt.subplots(figsize=(7,4))
-
-ax.plot(results["stock_price"], results["vega"], color = "b")
-ax.axvline(x=X, linestyle="--", color="grey", lw = .5)
-
-ax.spines["top"].set_visible(False)
-ax.spines["right"].set_visible(False)
-
-ax.set_xlabel("Stock Price")
-ax.set_ylabel("Vega")
-
-v_min, v_max = min(results["vega"]), max(results["vega"])
-v_ticks = np.arange(((v_min//5)*5)-5, ((v_max//5)*5)+10, 5)
-ax.set_yticks(v_ticks)
-ax.set_ylim(ymin=v_min-5, ymax=max(v_ticks)+3)
-
-ax.set_xticks(x_ticks, labels=x_ticks, rotation = 45)
-ax.set_xlim(xmin= np.min(x_ticks)-7, xmax=np.max(x_ticks)+7)
-
-plt.title("Vega vs Stock Price")
-plt.show()
-
-# rho
-fig, ax = plt.subplots(figsize=(10,6))
-
-ax.plot(results["stock_price"], results["rho_call"], label = "call", color="b")
-ax.plot(results["stock_price"], results["rho_put"], label = "put", color="r")
-ax.axvline(X, color = "grey", ls="--", lw=0.5)
-
-ax.spines["top"].set_visible(False)
-ax.spines["right"].set_visible(False)
-ax.spines["bottom"].set_position("zero")
-
-ax.set_xlabel("Stock Price", loc="right", labelpad=-42)
-ax.set_ylabel("Rho")
-
-ax.set_xticks(x_ticks, labels=x_ticks, rotation = 45)
-ax.set_xlim(xmin= np.min(x_ticks)-5, xmax=np.max(x_ticks)+5)
-
-r_min = min(min(results["rho_call"]), min(results["rho_put"]))
-r_max = max(max(results["rho_call"]), max(results["rho_put"]))
-r_ticks = np.arange(((r_min)//25)*25, r_max+25, 25)
-r_label = [f"{i:.0f}" for i in r_ticks]
-ax.set_yticks(r_ticks, labels=r_label)
-ax.set_ylim(ymin=r_min-20, ymax=r_max+20)
-
-plt.title("Rho vs Stock Price")
-plt.legend()
 plt.show()
