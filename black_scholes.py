@@ -3,6 +3,7 @@ import pandas as pd
 import yfinance as yf
 from scipy.stats import norm
 import matplotlib.pyplot as plt
+import os
 
 # inputs and data
 
@@ -17,12 +18,20 @@ r = 0.05
 
 # user input for the following from the same option 
 
-X = 307.5                   # strike price
-M = 3.41                    # market price    
-expiry_date = "2026-06-08"  # expiry date 
+X = 295                     # strike price
+M = 7.45                    # market price    
+expiry_date = "2026-07-02"  # expiry date 
 
 today = pd.Timestamp.now()
+
+if expiry_date <= today:
+    raise ValueError(f"Expiry date ({expiry_date}) must be in the future. Today is {today.date()}")
+
 T = (pd.Timestamp(expiry_date) - today).days / 365
+
+# create directory for outputs
+
+os.makedirs("outputs", exist_ok=True)
 
 # define for Black-Scoles pricing and Greeks
 
@@ -49,15 +58,15 @@ def compute_greeks(S,X,r,T,std):
     delta_call = N(d1)
     delta_put = -N(-d1)
 
-    theta_call = (-(S * n(d1) * std)/(2*np.sqrt(T))) - (r * X * (np.e**(-r*T)) * N(d2))
-    theta_put = (-(S * n(d1) * std)/(2*np.sqrt(T))) + (r * X * (np.e**(-r*T)) * N(-d2))
+    theta_call = (-(S * n(d1) * std)/(2*np.sqrt(T))) - (r * X * (np.exp(-r*T)) * N(d2))
+    theta_put = (-(S * n(d1) * std)/(2*np.sqrt(T))) + (r * X * (np.exp(-r*T)) * N(-d2))
 
     gamma = n(d1)/(S*std*np.sqrt(T))
 
     vega = S*np.sqrt(T)*n(d1)
 
-    rho_call = X * T * np.e**(-r*T) * N(d2)
-    rho_put = -X * T * np.e**(-r*T) * N(-d2)
+    rho_call = X * T * np.exp(-r*T) * N(d2)
+    rho_put = -X * T * np.exp(-r*T) * N(-d2)
 
     return {
         "delta_call"    : delta_call,
@@ -94,7 +103,7 @@ for stk in S_range:
     parity_check = stk - X * np.exp(-r*T)
     if np.isclose(call_price - put_price, parity_check) == False:
         print(f"Parity difference: {call_price - put_price - parity_check} (stock: {stk})")
-        break
+        continue
 
     results["call_price"].append(call_price.round(2))
     results["put_price"].append(put_price.round(2))
@@ -114,7 +123,7 @@ results = pd.DataFrame(results)
 
 # export results to csv
 
-results.to_csv("greeks.csv", index=False)
+results.to_csv("outputs/greeks.csv", index=False)
 
 # define formulas for Implied Volatility solver
 
@@ -154,6 +163,7 @@ if not np.isclose(M, verification_price):
 
 # summary 
 
+print("", end = "\n"*2)
 print("="*50)
 print(f"Black-Scholes Option Pricing - {list(company.keys())[0]}")
 print("-"*50)
@@ -276,4 +286,5 @@ for idx, (y_data, title, ylabel) in enumerate(plots):
         ax.set_xlabel("Spot Price", labelpad= -33)
         ax.legend(loc = "upper left")
 
+plt.savefig("outputs/greeks_chart.png", dpi=300, bbox_inches='tight')
 plt.show()
