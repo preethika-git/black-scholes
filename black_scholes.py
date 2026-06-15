@@ -20,14 +20,14 @@ r = 0.05
 
 X = 295                     # strike price
 M = 7.45                    # market price    
-expiry_date = "2026-07-02"  # expiry date 
+expiry_date = pd.Timestamp("2026-07-02")  # expiry date 
 
 today = pd.Timestamp.now()
 
 if expiry_date <= today:
     raise ValueError(f"Expiry date ({expiry_date}) must be in the future. Today is {today.date()}")
 
-T = (pd.Timestamp(expiry_date) - today).days / 365
+T = (expiry_date - today).days / 365
 
 # create directory for outputs
 
